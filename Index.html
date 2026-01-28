@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>PIXELS</title>
+<style>
+  body{margin:0;background:black;color:white;font-family:monospace;text-align:center}
+  canvas{background:#111;display:block;margin:auto}
+  button{font-size:18px;padding:10px;margin:5px}
+</style>
+</head>
+<body>
+
+<div id="menu">
+  <h1 style="letter-spacing:6px">P I X E L S</h1>
+  <button onclick="startGame()">TAP TO START</button>
+</div>
+
+<canvas id="game" width="360" height="200" style="display:none"></canvas>
+
+<div id="upgrade" style="display:none">
+  <h2>WEAPON UPGRADE</h2>
+  <button onclick="chooseWeapon(1)">Long Sword</button>
+  <button onclick="chooseWeapon(2)">Fast Sword</button>
+</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const GROUND=160;
+
+let state="menu";
+let level=1;
+let lives=3;
+let score=0;
+let weapon=1;
+
+let player={x:20,y:GROUND-16,w:16,h:16,vx:0,vy:0,onGround:true,attacking:false};
+let spikes=[], monsters=[], boss=null;
+
+function startGame(){
+  document.getElementById("menu").style.display="
