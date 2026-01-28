@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>PIXELS</title>
+<style>
+body{margin:0;background:black;color:white;font-family:monospace;text-align:center}
+canvas{display:block;margin:auto;background:#111}
+button{font-size:18px;padding:10px;margin:6px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+
+<!-- MAIN MENU -->
+<div id="menu">
+  <h1 style="letter-spacing:6px">P I X E L S</h1>
+  <p id="highScoreText"></p>
+  <button onclick="startGame()">TAP TO START</button>
+  <button onclick="openShop()">SHOP</button>
+</div>
+
+<!-- SHOP MENU -->
+<div id="shop" class="hidden">
+  <h2>WEAPONS</h2>
+  <button onclick="selectWeapon(1)">Long Sword</button>
+  <button onclick="selectWeapon(2)">Fast Sword</button>
+  <br><br>
+  <button onclick="closeShop()">BACK</button>
+</div>
+
+<!-- GAME CANVAS -->
+<canvas id="game" width="360" height="200" class="hidden"></canvas>
+
+<script>
+/* ---------- SAVE SYSTEM ---------- */
+let save = JSON.parse(localStorage.getItem("pixelsSave")) || {highScore:0,bestLevel:1,weapon:1};
+function saveGame(){localStorage.setItem("pixelsSave",JSON.stringify(save));}
+
+/* ---------- GAME SETUP ---------- */
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const GROUND=160;
+
+let state="menu";
+let level=1;
+let lives=3;
+let score=0;
+let weapon=save.weapon;
+
+let player={x:20,y:GROUND-16,w:16,h:16,vx:0,vy:0,attacking:false,onGround:true};
+let spikes=[],monsters=[],boss=null;
+
+/* ---------- BIOMES ---------- */
+const biomes=[{name:"Grass",bg:"#113311"},{name:"Desert",bg:"#553300"},{name:"Snow",bg:"#335577"}];
+function currentBiome(){return biomes[Math.floor((level-1)/10)%biomes.length];}
+
+/* ---------- MENUS ---------- */
+function startGame(){
+  document.getElementById("menu").classList.add("hidden");
+  canvas.classList.remove("hidden");
+  resetLevel();
+  state="play";
+}
+
+function openShop(){
+  document.getElementById("menu").classList.add("hidden");
+  document.getElementById("shop").classList.remove("hidden");
+}
+
+function closeShop(){
+  document.getElementById("shop").classList.add("hidden");
+  document.getElementById("menu").classList.remove("hidden");
+}
+
+function selectWeapon(w){
+  weapon=w;
+  save.weapon=w;
+  saveGame();
+  closeShop();
+}
+
+/* ---------- LEVEL ---------- */
+function resetLevel(){
+  player.x=20;
+  player.y=GROUND-16;
+  player.vy=0;
+  player.attacking=false;
+  player.onGround=true;
+
+  spikes=[];
+  monsters=[];
+  boss=null;
+
+  let spikeCount=2+Math.floor(level/6);
+  for(let i=0;i<spikeCount;i++){spikes.push({x:80+i*50,passed:false});}
+
+  let monsterCount=Math.min(1+Math.floor(level/5),5);
+  for(let i=0;i<monsterCount;i++){
+    monsters.push({x:200+i*30,y:GROUND-16,w:16,h:16,hp:1});
+  }
+
+  if(level%10===0){boss={x:260,y:GROUND-32,w:32,h:32,hp:10+level};}
+}
+
+/* ---------- INPUT ---------- */
+document.addEventListener("touchstart",()=>{
+  if(state==="play" && player.onGround) player.vy=-6;
+});
+document.addEventListener("keydown",e=>{
+  if(e.key===" ") player.attacking=true;
+  setTimeout(()=>player.attacking=false,150);
+});
+
+/* ---------- COLLISION ---------- */
+function hit(a,b){return a.x<a.w+b.x && a.x+a.w>b.x && a.y<a.h+b.y && a.y+a.h>b.y;}
+function loseLife(){
+  lives--;
+  if(lives<=0){
+    save.highScore=Math.max(save.highScore,score);
+    save.bestLevel=Math.max(save.bestLevel,level);
+    saveGame();
+    alert("YOU LOSE\nScore: "+score);
+    location.reload();
+  }
+  resetLevel();
+}
+
+/* ---------- UPDATE ---------- */
+function update(){
+  if(state!=="play")return;
+
+  player.vy+=0.4;
+  player.y+=player.vy;
+  if(player.y>=GROUND-player.h){player.y=GROUND-player.h;player.vy=0;player.onGround=true;}
+  player.x+=2;
+
+  spikes.forEach(s=>{
+    if(player.x+player.w>s.x && player.x<s.x+16 && player.y+player.h>=GROUND) loseLife();
+    if(player.x>s.x+16 && !s.passed){s.passed=true;score+=50;}
+  });
+
+  monsters.forEach(m=>{
+    if(m.hp<=0)return;
+    if(hit(player,m))loseLife();
+    if(player.attacking && hit({x:player.x+player.w,y:player.y,w:weapon===1?20:12,h:16},m)){
+      m.hp=0;score+=100;
+    }
+  });
+
+  if(boss){
+    if(hit(player,boss))loseLife();
+    if(player.attacking && hit({x:player.x+player.w,y:player.y,w:20,h:16},boss)){
+      boss.hp--;
+      if(boss.hp<=0){score+=500;boss=null;}
+    }
+  }
+
+  if(player.x>canvas.width){
+    score+=100;
+    level++;
+    resetLevel();
+  }
+}
+
+/* ---------- DRAW ---------- */
+function draw(){
+  ctx.fillStyle=currentBiome().bg;
+  ctx.fillRect(0,0,360,200);
+
+  ctx.fillStyle="#444";
+  ctx.fillRect(0,GROUND,360,40);
+
+  ctx.fillStyle="cyan";
+  ctx.fillRect(player.x,player.y,player.w,player.h);
+
+  ctx.fillStyle="red";
+  spikes.forEach(s=>{
+    ctx.beginPath();
+    ctx.moveTo(s.x,GROUND);
+    ctx.lineTo(s.x+8,GROUND-16);
+    ctx.lineTo(s.x+16,GROUND);
+    ctx.fill();
+  });
+
+  ctx.fillStyle="purple";
+  monsters.forEach(m=>{if(m.hp>0)ctx.fillRect(m.x,m.y,m.w,m.h);});
+
+  if(boss){ctx.fillStyle="orange";ctx.fillRect(boss.x,boss.y,boss.w,boss.h);}
+
+  ctx.fillStyle="white";
+  ctx.fillText("Lives: "+lives,10,12);
+  ctx.fillText("Score: "+score,10,24);
+  ctx.fillText("High: "+save.highScore,10,36);
+  ctx.fillText("Level: "+level,10,48);
+  ctx.fillText("Weapon: "+(weapon===1?"Long":"Fast"),10,60);
+  ctx.fillText("Biome: "+currentBiome().name,10,72);
+}
+
+/* ---------- LOOP ---------- */
+function loop(){update();draw();requestAnimationFrame(loop);}
+document.getElementById("highScoreText").innerText="High Score: "+save.highScore;
+loop();
+</script>
+</body>
+</html>
